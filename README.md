@@ -94,7 +94,7 @@ python -m dashboard.app
 
 ## Roadmap
 
-- [ ] Corridor simulator with peak demand pattern
+- [x] Corridor simulator with peak demand pattern
 - [ ] Dispatcher agent with handoff tool calls + explanations
 - [ ] Deterministic verifier (destination, ETA window, capacity)
 - [ ] Rider agents with patience-driven decisions

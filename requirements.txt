@@ -1,0 +1,2 @@
+# Phase 1 uses the Python standard library only. Agent, voice and
+# dashboard dependencies arrive with their phases.
