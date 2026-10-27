@@ -1,2 +1,4 @@
-# Phase 1 uses the Python standard library only. Agent, voice and
-# dashboard dependencies arrive with their phases.
+# Simulator, ledger and verifier use the Python standard library only.
+# Phase 4 adds the OpenAI SDK for the Muse Spark dispatcher
+# (OpenAI-compatible client pointed at the Meta Model API).
+openai>=1.0

@@ -40,9 +40,12 @@ flowchart LR
 
 | Model | Role |
 |---|---|
-| Muse Spark | Dispatcher agent — reads corridor state, calls handoff tools, explains decisions |
+| Muse Spark 1.3 contributor (`muse-spark-1.3-contributor`) | Dispatcher agent — reads corridor state, calls handoff tools, explains decisions |
 | Muse Spark Open (via Baseten / Modal) | Rider agents — per-rider walk/stay decisions |
 | Muse Voice Transcribe | Tamil/English speech-to-text for driver and rider crowd signals |
+
+> [!NOTE]
+> The dispatcher runs on the contributor tier: identical model, lower price, and Meta may train on the traffic. Payloads are synthetic sim state (bus loads, stop ids), never personal data.
 
 ## What success looks like
 
@@ -71,7 +74,7 @@ busdrop/
 ### Prerequisites
 
 - Python 3.11+
-- API access to Muse Spark, a Muse Spark Open endpoint (Baseten / Modal), and Muse Voice Transcribe
+- A Meta Model API key in `MODEL_API_KEY` (dispatcher only — [get one](https://dev.meta.ai)); a Muse Spark Open endpoint (Baseten / Modal) and Muse Voice Transcribe arrive with later phases
 
 ### Quickstart
 
@@ -83,7 +86,7 @@ pip install -r requirements.txt
 # Run a peak-hour simulation without handoffs (baseline)
 python -m simulator.run --no-handoff
 
-# Run with scripted handoffs (mechanical demo; the agent arrives in phase 4)
+# Run with scripted handoffs (mechanical baseline for the agent to match)
 python -m simulator.run --handoff scripted
 
 # Run with a reckless proposer (the verifier blocks the unsafe handoffs)
@@ -104,7 +107,7 @@ python -m dashboard.app
 - [x] Corridor simulator with peak demand pattern
 - [x] Ticket ledger + handoff mechanics (scripted demo policy)
 - [x] Deterministic verifier (destination, ETA window, capacity, ticket)
-- [ ] Dispatcher agent with handoff tool calls + explanations
+- [x] Dispatcher agent with handoff tool calls + explanations
 - [ ] Rider agents with patience-driven decisions
 - [ ] Tamil/English voice crowd signals
 - [ ] Dashboard with live map and run comparison

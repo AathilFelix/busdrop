@@ -96,7 +96,7 @@ def execute_handoff(
     return HandoffResult(True, moved=moved)
 
 
-def _eligible_waiting(sim: Simulation, bus_id: str, stop_id: str) -> int:
+def eligible_waiting(sim: Simulation, bus_id: str, stop_id: str) -> int:
     """Waiting riders at a stop whose destination this bus serves."""
     route = sim.routes[sim.buses[bus_id].route_id]
     downstream = set(route.downstream_of(stop_id))
@@ -116,10 +116,10 @@ def scripted_policy(
     strictly reduces encounters with a full bus this minute; no seats are
     held back for the receiver's "own" queue because it faces only the
     remainder. This is a mechanical test harness, not the agent: the Muse
-    Spark dispatcher (phase 4) replaces it.
+    Spark dispatcher (dispatcher/) is the agentic driver.
     """
     bus = sim.buses[bus_id]
-    shortfall = _eligible_waiting(sim, bus_id, stop_id) - (
+    shortfall = eligible_waiting(sim, bus_id, stop_id) - (
         bus.capacity - len(bus.onboard))
     if shortfall <= 0:
         return []

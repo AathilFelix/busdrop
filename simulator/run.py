@@ -25,6 +25,8 @@ def print_report(
     if res.verifier_approvals or res.verifier_rejections:
         print(f"  Verifier: {res.verifier_approvals} approved | "
               f"{res.verifier_rejections} rejected")
+    if res.dispatcher_errors:
+        print(f"  Dispatcher errors (ticks skipped): {res.dispatcher_errors}")
     print(f"  Avg wait: {res.avg_wait_min:.1f} min")
     print(f"  Peak load factor: {res.peak_load_factor:.2f}")
     print("  Per route:")
@@ -35,6 +37,20 @@ def print_report(
               f"avg_load={res.avg_load_by_route[rid]:.2f}")
 
 
+def print_log(sim: Simulation) -> None:
+    if not sim.dispatcher_log:
+        return
+    print("  Dispatcher decisions:")
+    for entry in sim.dispatcher_log:
+        mark = "ok" if entry["approved"] else "blocked"
+        riders = entry["rider_ids"]
+        print(f"    t={entry['minute']} {entry['stop_id']}: "
+              f"{entry['from_bus']} -> {entry['to_bus']} "
+              f"({len(riders)} riders) [{mark}]")
+        if entry["explanation"]:
+            print(f"      \"{entry['explanation']}\"")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="BusDrop corridor simulator")
     parser.add_argument("--no-handoff", action="store_true",
@@ -42,30 +58,48 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--handoff", choices=["scripted", "reckless"],
                         default=None,
                         help="handoff driver: scripted demo policy, or "
-                        "reckless proposer (verifier blocks the bad moves; "
-                        "the agent arrives in phase 4)")
+                        "reckless proposer (verifier blocks the bad moves)")
     parser.add_argument("--dispatcher", metavar="AGENT",
-                        help="agentic dispatcher (arrives in phase 4)")
+                        help="agentic dispatcher: spark (Muse Spark 1.3 "
+                        "contributor; needs MODEL_API_KEY)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--minutes", type=int, default=180)
     parser.add_argument("--demand-scale", type=float, default=1.0,
                         help="multiply all arrival rates (sensitivity tests)")
     args = parser.parse_args(argv)
 
-    if args.dispatcher is not None:
-        print(f"error: --dispatcher {args.dispatcher} arrives in phase 4; "
-              "phase 3 runs the baseline or demo handoffs only",
-              file=sys.stderr)
+    if args.dispatcher is not None and args.dispatcher != "spark":
+        print(f"error: unknown dispatcher {args.dispatcher!r} "
+              "(only --dispatcher spark exists)", file=sys.stderr)
         return 2
-    if args.no_handoff and args.handoff is not None:
-        print("error: --no-handoff and --handoff are mutually exclusive",
+    if args.no_handoff and (args.handoff is not None
+                            or args.dispatcher is not None):
+        print("error: --no-handoff is mutually exclusive with --handoff "
+              "and --dispatcher", file=sys.stderr)
+        return 2
+    if args.handoff is not None and args.dispatcher is not None:
+        print("error: --handoff and --dispatcher are mutually exclusive",
               file=sys.stderr)
         return 2
 
     stops, routes, buses = build_corridor()
     riders = generate_riders(stops, routes, args.minutes,
                              seed=args.seed, scale=args.demand_scale)
-    if args.handoff is not None:
+    if args.dispatcher == "spark":
+        from dispatcher import DispatcherError, SparkClient, spark_policy_factory
+
+        try:
+            client = SparkClient()
+        except DispatcherError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        sim = Simulation(stops, routes, buses, riders, args.minutes,
+                         handoff_policy=spark_policy_factory(client))
+        res = sim.run()
+        print_report(res, args.seed, args.minutes,
+                     mode=f"spark dispatcher ({client.model})")
+        print_log(sim)
+    elif args.handoff is not None:
         sim = Simulation(stops, routes, buses, riders, args.minutes,
                          handoff_policy=POLICIES[args.handoff])
         res = sim.run()

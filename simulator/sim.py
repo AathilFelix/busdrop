@@ -7,6 +7,9 @@ are executed through the validated execute_handoff machinery.
 
 Phase 3 routes every request through the deterministic verifier first:
 the policy proposes, the verifier authorizes, the ledger executes.
+
+Phase 4 adds the dispatcher log: every proposal with its explanation
+and verdict, for the agentic dispatcher to narrate its decisions.
 """
 from __future__ import annotations
 
@@ -22,9 +25,10 @@ from .network import DWELL_MIN, LEG_MIN
 
 COOLDOWN_MIN = 40  # extra minutes after arrivals stop so buses finish trips
 
-# (sim, bus_id, stop_id, minute) -> [(to_bus_id, [rider_ids])].
+# (sim, bus_id, stop_id, minute) -> requests. A request is
+# (to_bus_id, [rider_ids]) or (to_bus_id, [rider_ids], explanation).
 HandoffPolicy = Callable[
-    ["Simulation", str, str, int], list[tuple[str, list[str]]]
+    ["Simulation", str, str, int], list[tuple]
 ]
 
 
@@ -42,6 +46,7 @@ class SimResult:
     riders_transferred: int = 0
     verifier_approvals: int = 0
     verifier_rejections: int = 0
+    dispatcher_errors: int = 0
     boardings_by_route: dict[str, int] = field(default_factory=dict)
     denied_by_route: dict[str, int] = field(default_factory=dict)
     peak_load_by_route: dict[str, float] = field(default_factory=dict)
@@ -66,6 +71,7 @@ class Simulation:
         self.minutes = minutes
         self.handoff_policy = handoff_policy
         self.ledger = TicketLedger()
+        self.dispatcher_log: list[dict] = []
         self._events = self._timetable()
         self._meet_counter = 0
         self.queues: dict[str, list[Rider]] = {sid: [] for sid in stops}
@@ -118,11 +124,20 @@ class Simulation:
 
         if self.handoff_policy is not None and self.stops[stop_id].shared:
             requests = self.handoff_policy(self, bus.id, stop_id, minute) or []
-            for to_bus_id, rider_ids in requests:
+            for request in requests:
+                to_bus_id, rider_ids = request[0], request[1]
+                explanation = request[2] if len(request) > 2 else ""
                 proposal = Proposal(
                     from_bus=bus.id, to_bus=to_bus_id, stop_id=stop_id,
                     rider_ids=tuple(rider_ids), minute=minute)
-                if not verify(self, proposal).approved:
+                approved = verify(self, proposal).approved
+                self.dispatcher_log.append({
+                    "minute": minute, "stop_id": stop_id,
+                    "from_bus": bus.id, "to_bus": to_bus_id,
+                    "rider_ids": list(rider_ids),
+                    "explanation": explanation, "approved": approved,
+                })
+                if not approved:
                     res.verifier_rejections += 1
                     continue
                 res.verifier_approvals += 1
