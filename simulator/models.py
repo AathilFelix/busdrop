@@ -26,8 +26,9 @@ class Route:
 class Ticket:
     """A ticket belongs to a destination, not to a bus.
 
-    Issued on boarding. fare_paid carries over if the rider later moves to
-    another bus; transfer machinery arrives in phase 2 with the TicketLedger.
+    Issued on boarding. fare_paid carries over when the rider moves to
+    another bus; each move appends (from_bus, to_bus, stop_id) here and is
+    recorded in the TicketLedger with its minute.
     """
 
     rider_id: str

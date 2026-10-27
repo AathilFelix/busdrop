@@ -82,6 +82,9 @@ pip install -r requirements.txt
 # Run a peak-hour simulation without handoffs (baseline)
 python -m simulator.run --no-handoff
 
+# Run with scripted handoffs (mechanical demo; the agent arrives in phase 4)
+python -m simulator.run --handoff scripted
+
 # Run with the agentic dispatcher
 python -m simulator.run --dispatcher spark
 
@@ -95,6 +98,7 @@ python -m dashboard.app
 ## Roadmap
 
 - [x] Corridor simulator with peak demand pattern
+- [x] Ticket ledger + handoff mechanics (scripted demo policy)
 - [ ] Dispatcher agent with handoff tool calls + explanations
 - [ ] Deterministic verifier (destination, ETA window, capacity)
 - [ ] Rider agents with patience-driven decisions

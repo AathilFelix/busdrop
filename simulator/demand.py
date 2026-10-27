@@ -11,18 +11,21 @@ PEAK_MIN = 105  # demand peaks 105 min into the window (08:45 for a 07:00 start)
 PEAK_WIDTH = 28.0
 BASE_SHARE = 0.25  # off-peak rate as a share of the peak rate
 
-# Riders per minute at each stop at the height of the peak. Royapettah is
-# the hot branch (fills its buses from branch boardings alone at peak),
-# Gemini the quiet one, so overflow and spare capacity coexist on the
-# same trunk.
+# Riders per minute at each stop at the height of the peak. Tuned (phase 2)
+# so the pain is fixable pain: R1's branch is hot enough that its buses
+# reach the trunk nearly full, R2/R3's branches stay light so they arrive
+# with spare seats, and trunk demand builds queues at the timed meets
+# without swamping the spare capacity. Branch stops stay just under the
+# per-bus capacity line so nearly all denied boardings happen at shared
+# trunk stops, where a handoff can actually help.
 STOP_PEAK_RATE = {
-    "ROY": 1.6,
-    "PYC": 1.0,
-    "TEY": 0.9,
-    "SIE": 0.6,
+    "ROY": 1.3,
+    "PYC": 0.75,
+    "TEY": 0.5,
+    "SIE": 0.4,
     "GEM": 0.45,
-    "THL": 1.3,
-    "LIC": 1.0,
+    "THL": 1.0,
+    "LIC": 0.9,
     "SIM": 0.7,
     "CEN": 0.5,
     "BWY": 0.0,  # terminus: nobody boards

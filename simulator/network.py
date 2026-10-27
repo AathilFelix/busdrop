@@ -10,6 +10,12 @@ DWELL_MIN = 1  # dwell time at each stop
 # Trunk stops are served by all three routes, in the same order.
 _TRUNK = ["THL", "LIC", "SIM", "CEN", "BWY"]
 
+# Timed meets: R1 and R2 have two branch stops before the trunk, R3 only
+# one, so R3 departures shift +5 min and all three routes dwell at each
+# trunk stop simultaneously. Without this, R3 never meets another bus and
+# a third of the fleet is useless for handoffs.
+DEFAULT_ROUTE_OFFSETS = {"R3": 5}
+
 
 def build_stops() -> dict[str, Stop]:
     names = {
@@ -47,7 +53,9 @@ def build_buses(
     capacity: int = 40,
     first_departure: int = 0,
     headway: int = 20,
+    route_offsets: dict[str, int] | None = None,
 ) -> list[Bus]:
+    offsets = route_offsets or {}
     buses = []
     for route_id in sorted(routes):
         for i in range(buses_per_route):
@@ -55,7 +63,8 @@ def build_buses(
                 id=f"{route_id}-B{i + 1}",
                 route_id=route_id,
                 capacity=capacity,
-                start_min=first_departure + i * headway,
+                start_min=(first_departure + offsets.get(route_id, 0)
+                           + i * headway),
             ))
     return buses
 
@@ -65,9 +74,12 @@ def build_corridor(
     capacity: int = 40,
     first_departure: int = 0,
     headway: int = 20,
+    route_offsets: dict[str, int] | None = None,
 ) -> tuple[dict[str, Stop], dict[str, Route], list[Bus]]:
+    if route_offsets is None:
+        route_offsets = DEFAULT_ROUTE_OFFSETS
     stops = build_stops()
     routes = build_routes()
     buses = build_buses(routes, buses_per_route, capacity,
-                        first_departure, headway)
+                        first_departure, headway, route_offsets)
     return stops, routes, buses
