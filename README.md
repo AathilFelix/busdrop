@@ -27,13 +27,14 @@ flowchart LR
 3. **Verifier** is a deterministic safety layer that approves or rejects each proposal:
    - both buses serve the rider's destination,
    - both buses are within a short window of the shared stop,
-   - the receiving bus has enough spare capacity.
+   - the receiving bus has enough spare capacity,
+   - every rider holds a valid ticket for the destination.
 4. **Rider agents** (Muse Spark Open) are simulated riders with a destination and a patience level who decide whether to walk across.
 5. **Voice input** (Muse Voice Transcribe) turns Tamil/English driver and rider speech into crowd signals for the dispatcher.
 6. **Dashboard** shows buses on a live map and compares runs with and without handoff: peak load, riders left behind, average wait.
 
 > [!NOTE]
-> The verifier is the safety backstop: the agent proposes, but only the verifier's rule checks can authorize a handoff. No proposal moves riders without passing all three checks.
+> The verifier is the safety backstop: the agent proposes, but only the verifier's rule checks can authorize a handoff. No proposal moves riders without passing all four checks.
 
 ## Meta models used
 
@@ -85,6 +86,9 @@ python -m simulator.run --no-handoff
 # Run with scripted handoffs (mechanical demo; the agent arrives in phase 4)
 python -m simulator.run --handoff scripted
 
+# Run with a reckless proposer (the verifier blocks the unsafe handoffs)
+python -m simulator.run --handoff reckless
+
 # Run with the agentic dispatcher
 python -m simulator.run --dispatcher spark
 
@@ -99,8 +103,8 @@ python -m dashboard.app
 
 - [x] Corridor simulator with peak demand pattern
 - [x] Ticket ledger + handoff mechanics (scripted demo policy)
+- [x] Deterministic verifier (destination, ETA window, capacity, ticket)
 - [ ] Dispatcher agent with handoff tool calls + explanations
-- [ ] Deterministic verifier (destination, ETA window, capacity)
 - [ ] Rider agents with patience-driven decisions
 - [ ] Tamil/English voice crowd signals
 - [ ] Dashboard with live map and run comparison

@@ -1,13 +1,15 @@
-"""CLI entry point: python -m simulator.run [--no-handoff | --handoff scripted]."""
+"""CLI entry point: python -m simulator.run [--no-handoff | --handoff MODE]."""
 from __future__ import annotations
 
 import argparse
 import sys
 
 from .demand import generate_riders
-from .handoff import scripted_policy
+from .handoff import reckless_policy, scripted_policy
 from .network import build_corridor
 from .sim import SimResult, Simulation, run_baseline
+
+POLICIES = {"scripted": scripted_policy, "reckless": reckless_policy}
 
 
 def print_report(
@@ -20,6 +22,9 @@ def print_report(
     if res.handoff_events:
         print(f"  Handoffs: {res.handoff_events} events | "
               f"{res.riders_transferred} riders moved")
+    if res.verifier_approvals or res.verifier_rejections:
+        print(f"  Verifier: {res.verifier_approvals} approved | "
+              f"{res.verifier_rejections} rejected")
     print(f"  Avg wait: {res.avg_wait_min:.1f} min")
     print(f"  Peak load factor: {res.peak_load_factor:.2f}")
     print("  Per route:")
@@ -34,9 +39,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="BusDrop corridor simulator")
     parser.add_argument("--no-handoff", action="store_true",
                         help="baseline mode: no handoffs (default)")
-    parser.add_argument("--handoff", choices=["scripted"], default=None,
-                        help="handoff driver: scripted demo policy "
-                        "(mechanical harness; the agent arrives in phase 4)")
+    parser.add_argument("--handoff", choices=["scripted", "reckless"],
+                        default=None,
+                        help="handoff driver: scripted demo policy, or "
+                        "reckless proposer (verifier blocks the bad moves; "
+                        "the agent arrives in phase 4)")
     parser.add_argument("--dispatcher", metavar="AGENT",
                         help="agentic dispatcher (arrives in phase 4)")
     parser.add_argument("--seed", type=int, default=42)
@@ -47,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dispatcher is not None:
         print(f"error: --dispatcher {args.dispatcher} arrives in phase 4; "
-              "phase 2 runs the baseline or scripted handoffs only",
+              "phase 3 runs the baseline or demo handoffs only",
               file=sys.stderr)
         return 2
     if args.no_handoff and args.handoff is not None:
@@ -58,11 +65,12 @@ def main(argv: list[str] | None = None) -> int:
     stops, routes, buses = build_corridor()
     riders = generate_riders(stops, routes, args.minutes,
                              seed=args.seed, scale=args.demand_scale)
-    if args.handoff == "scripted":
+    if args.handoff is not None:
         sim = Simulation(stops, routes, buses, riders, args.minutes,
-                         handoff_policy=scripted_policy)
+                         handoff_policy=POLICIES[args.handoff])
         res = sim.run()
-        print_report(res, args.seed, args.minutes, mode="scripted handoff")
+        print_report(res, args.seed, args.minutes,
+                     mode=f"{args.handoff} handoff")
     else:
         res = run_baseline(stops, routes, buses, riders, args.minutes)
         print_report(res, args.seed, args.minutes)

@@ -4,11 +4,16 @@ riders board the first bus serving their destination; no handoffs.
 Phase 2 adds an optional handoff policy hook: at each shared-stop event,
 after alighting and before boarding, the policy may request handoffs that
 are executed through the validated execute_handoff machinery.
+
+Phase 3 routes every request through the deterministic verifier first:
+the policy proposes, the verifier authorizes, the ledger executes.
 """
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+
+from verifier import Proposal, verify
 
 from .handoff import execute_handoff
 from .ledger import TicketLedger
@@ -35,6 +40,8 @@ class SimResult:
     peak_load_factor: float = 0.0
     handoff_events: int = 0
     riders_transferred: int = 0
+    verifier_approvals: int = 0
+    verifier_rejections: int = 0
     boardings_by_route: dict[str, int] = field(default_factory=dict)
     denied_by_route: dict[str, int] = field(default_factory=dict)
     peak_load_by_route: dict[str, float] = field(default_factory=dict)
@@ -90,6 +97,11 @@ class Simulation:
         return [bid for bid, sid in self._events.get(minute, [])
                 if sid == stop_id]
 
+    def dwells_at(self, bus_id: str, stop_id: str) -> list[int]:
+        """Minutes at which a bus dwells at a stop, in time order."""
+        return sorted(m for m, evs in self._events.items()
+                      for b, s in evs if b == bus_id and s == stop_id)
+
     def _process_stop(self, bus: Bus, stop_id: str, minute: int) -> None:
         route = self.routes[bus.route_id]
         res = self.result
@@ -107,6 +119,13 @@ class Simulation:
         if self.handoff_policy is not None and self.stops[stop_id].shared:
             requests = self.handoff_policy(self, bus.id, stop_id, minute) or []
             for to_bus_id, rider_ids in requests:
+                proposal = Proposal(
+                    from_bus=bus.id, to_bus=to_bus_id, stop_id=stop_id,
+                    rider_ids=tuple(rider_ids), minute=minute)
+                if not verify(self, proposal).approved:
+                    res.verifier_rejections += 1
+                    continue
+                res.verifier_approvals += 1
                 result = execute_handoff(
                     self, bus.id, to_bus_id, stop_id, rider_ids, minute)
                 if result.ok:

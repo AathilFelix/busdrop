@@ -147,3 +147,25 @@ def scripted_policy(
     if not eligible:
         return []
     return [(to_bus_id, eligible[:min(shortfall, spare)])]
+
+
+def reckless_policy(
+    sim: Simulation, bus_id: str, stop_id: str, minute: int
+) -> list[tuple[str, list[str]]]:
+    """Deliberately bad proposer: throws every onboard rider at the first
+    co-located other-route bus with no capacity or destination checks.
+
+    Exists to prove the safety story: the verifier must reject the
+    dangerous requests, so even a reckless proposer cannot overfill a
+    bus, strand a rider, or break ticket validity.
+    """
+    bus = sim.buses[bus_id]
+    if not bus.onboard:
+        return []
+    for other_id in sim.buses_at(stop_id, minute):
+        if other_id == bus_id:
+            continue
+        if sim.buses[other_id].route_id == bus.route_id:
+            continue
+        return [(other_id, list(bus.onboard))]
+    return []
