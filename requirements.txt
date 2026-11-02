@@ -2,3 +2,12 @@
 # Phase 4 adds the OpenAI SDK for the Muse Spark dispatcher
 # (OpenAI-compatible client pointed at the Meta Model API).
 openai>=1.0
+# Phase 7 adds Streamlit (dashboard) with pydeck maps.
+streamlit>=1.0
+pydeck>=0.8
+# Test runner for the unittest suite in tests/.
+pytest>=7.0
+# Web frontend API (FastAPI backend serving the Next.js app in web/).
+fastapi>=0.100
+uvicorn>=0.20
+httpx>=0.24  # API contract tests (Starlette TestClient transport)

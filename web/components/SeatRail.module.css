@@ -1,0 +1,152 @@
+.rail {
+  background: var(--sheet);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sheet);
+  padding: 20px 22px;
+  min-height: 100%;
+}
+
+.rail h2 {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.rail > p {
+  margin-top: 12px;
+  font-size: 14.5px;
+  color: var(--ink-soft);
+}
+
+.ticket {
+  margin-top: 14px;
+  border: 1px dashed var(--ink-faint);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--paper);
+}
+
+.ticketTo {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 19px;
+}
+
+.ticketMeta {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.status {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.note {
+  border-top: 1px solid var(--hairline);
+  padding-top: 12px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.feed {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.feed li {
+  position: relative;
+  border-top: 1px solid var(--hairline);
+  padding: 12px 0 14px;
+}
+
+.feedHead {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  padding-right: 92px;
+}
+
+.feedMeta {
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.feedNote {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.stamp {
+  position: absolute;
+  top: 12px;
+  right: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
+  padding: 2px 8px;
+  transform: rotate(2deg);
+}
+
+.stamp.ok {
+  color: var(--ok);
+}
+
+.stamp.blocked {
+  color: var(--stamp);
+}
+
+.footnote {
+  border-top: 1px solid var(--hairline);
+  padding-top: 12px;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+.numbers {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14.5px;
+}
+
+.numbers strong {
+  font-size: 19px;
+}
+
+.numbers span {
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+.routes {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-soft);
+}

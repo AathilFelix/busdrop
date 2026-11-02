@@ -1,0 +1,130 @@
+/* The Diagram: a Beck-style schematic world. Paper ground, ink linework,
+   three line colors, timetable rules, tabular mono figures. */
+
+:root {
+  --paper: #f2f3f1;
+  --sheet: #ffffff;
+  --ink: #17212b;
+  --ink-soft: #3d4a58;
+  --ink-faint: #5b6672;
+  --hairline: #d8dbd6;
+  --r1: #b03a30; /* Royapettah brick */
+  --r2: #0e7c7b; /* Teynampet teal */
+  --r3: #c98a1b; /* Gemini amber, darkened for linework */
+  --stamp: #e03e2d; /* vermilion: handoff moments only */
+  --stamp-deep: #b62e21;
+  --ok: #1e7e34;
+  --radius-sheet: 14px;
+  --font-sans: "Archivo Variable", "Archivo", system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  caret-color: var(--ink);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  text-wrap: balance;
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+  max-width: 68ch;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Timetable figures: tabular everywhere numbers appear. */
+.tnum,
+td,
+time,
+output {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Data-chart tick labels: always true body size, never viewBox-scaled. */
+.chartTick {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--ink-faint);
+}
+
+/* Thin scrollbars in the world's own greys. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-faint) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--ink-faint);
+  border-radius: 8px;
+  border: 2px solid var(--paper);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

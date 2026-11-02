@@ -222,8 +222,21 @@ class TestScriptedPolicy(unittest.TestCase):
     def test_moves_shortfall_to_roomiest_bus(self):
         sim = tiny_world()
         self.queue_at(sim, "S", 3)  # shortfall 3, B1 spare 2
-        self.assertEqual(scripted_policy(sim, "A1", "S", 5),
-                         [("B1", ["r1", "r2"])])
+        got = scripted_policy(sim, "A1", "S", 5)
+        self.assertEqual(len(got), 1)
+        to_bus, riders, explanation = got[0]
+        self.assertEqual((to_bus, riders), ("B1", ["r1", "r2"]))
+        self.assertIn("A1", explanation)
+        self.assertIn("B1", explanation)
+
+    def test_explanation_uses_singular_for_one(self):
+        sim = tiny_world()
+        self.queue_at(sim, "S", 1)  # shortfall 1, B1 spare 2
+        got = scripted_policy(sim, "A1", "S", 5)
+        self.assertEqual(len(got), 1)
+        self.assertEqual(
+            got[0][2], "A1 is full with 1 rider still waiting, so 1 going "
+                       "the same way moves to B1, which has spare seats.")
 
     def test_noop_when_receiver_full(self):
         sim = tiny_world()
@@ -309,6 +322,18 @@ class TestHandoffIntegration(unittest.TestCase):
         self.assertEqual(res.handoff_events, 0)
         self.assertEqual(res.riders_transferred, 0)
         self.assertEqual(len(sim.ledger), 0)
+
+    def test_scripted_explains_each_move(self):
+        sim, res = self.run_corridor(42, scripted_policy)
+        self.assertGreater(res.handoff_events, 0)
+        self.assertEqual(len(sim.dispatcher_log), res.handoff_events)
+        for entry in sim.dispatcher_log:
+            self.assertTrue(entry["explanation"], entry)
+            self.assertIn(entry["from_bus"], entry["explanation"])
+            self.assertIn(entry["to_bus"], entry["explanation"])
+        notes = [e["explanation"] for e in sim.dispatcher_log]
+        self.assertTrue(any("20 riders still waiting" in n for n in notes),
+                        notes)
 
 
 if __name__ == "__main__":

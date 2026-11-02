@@ -7,7 +7,7 @@ import sys
 from .demand import generate_riders
 from .handoff import reckless_policy, scripted_policy
 from .network import build_corridor
-from .sim import SimResult, Simulation, run_baseline
+from .sim import SimResult, Simulation
 
 POLICIES = {"scripted": scripted_policy, "reckless": reckless_policy}
 
@@ -27,6 +27,12 @@ def print_report(
               f"{res.verifier_rejections} rejected")
     if res.dispatcher_errors:
         print(f"  Dispatcher errors (ticks skipped): {res.dispatcher_errors}")
+    if res.rider_offers:
+        print(f"  Riders: {res.rider_offers} offered | "
+              f"{res.rider_offers - res.rider_declines} walked | "
+              f"{res.rider_declines} stayed")
+    if res.rider_errors:
+        print(f"  Rider agent errors (fell back to rule): {res.rider_errors}")
     print(f"  Avg wait: {res.avg_wait_min:.1f} min")
     print(f"  Peak load factor: {res.peak_load_factor:.2f}")
     print("  Per route:")
@@ -44,9 +50,11 @@ def print_log(sim: Simulation) -> None:
     for entry in sim.dispatcher_log:
         mark = "ok" if entry["approved"] else "blocked"
         riders = entry["rider_ids"]
+        declined = entry.get("declined_ids", [])
+        stayed = f", {len(declined)} stayed" if declined else ""
         print(f"    t={entry['minute']} {entry['stop_id']}: "
               f"{entry['from_bus']} -> {entry['to_bus']} "
-              f"({len(riders)} riders) [{mark}]")
+              f"({len(riders)} riders{stayed}) [{mark}]")
         if entry["explanation"]:
             print(f"      \"{entry['explanation']}\"")
 
@@ -62,6 +70,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dispatcher", metavar="AGENT",
                         help="agentic dispatcher: spark (Muse Spark 1.3 "
                         "contributor; needs MODEL_API_KEY)")
+    parser.add_argument("--riders", choices=["rule", "open"], default=None,
+                        help="rider consent: rule (offline patience rule) or "
+                        "open (Muse Spark Open agents; needs "
+                        "SPARK_OPEN_BASE_URL + SPARK_OPEN_API_KEY)")
+    parser.add_argument("--voice", metavar="DEMO_OR_PATH", default=None,
+                        help="voice crowd signals: demo (built-in Tamil + "
+                        "English driver notes) or a JSON transcript file")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--minutes", type=int, default=180)
     parser.add_argument("--demand-scale", type=float, default=1.0,
@@ -85,6 +100,40 @@ def main(argv: list[str] | None = None) -> int:
     stops, routes, buses = build_corridor()
     riders = generate_riders(stops, routes, args.minutes,
                              seed=args.seed, scale=args.demand_scale)
+
+    rider_policy = None
+    if args.riders is not None:
+        from riders import (RiderError, SparkOpenClient,
+                            rider_policy_factory)
+
+        if args.riders == "open":
+            try:
+                rider_client = SparkOpenClient()
+            except RiderError as e:
+                print(f"error: {e}", file=sys.stderr)
+                return 1
+            rider_policy = rider_policy_factory(rider_client)
+        else:
+            rider_policy = rider_policy_factory()
+
+    voice_feed = None
+    if args.voice is not None:
+        from voice import load_demo, load_file
+
+        try:
+            voice_feed = (load_demo() if args.voice == "demo"
+                          else load_file(args.voice))
+        except (ValueError, OSError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+
+    extras = []
+    if rider_policy is not None:
+        extras.append(f"riders={args.riders}")
+    if voice_feed is not None:
+        extras.append(f"voice={args.voice} ({len(voice_feed)} signals)")
+    suffix = f" [{', '.join(extras)}]" if extras else ""
+
     if args.dispatcher == "spark":
         from dispatcher import DispatcherError, SparkClient, spark_policy_factory
 
@@ -94,20 +143,29 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {e}", file=sys.stderr)
             return 1
         sim = Simulation(stops, routes, buses, riders, args.minutes,
-                         handoff_policy=spark_policy_factory(client))
+                         handoff_policy=spark_policy_factory(client),
+                         rider_policy=rider_policy,
+                         voice_feed=voice_feed)
         res = sim.run()
         print_report(res, args.seed, args.minutes,
-                     mode=f"spark dispatcher ({client.model})")
+                     mode=f"spark dispatcher ({client.model}){suffix}")
         print_log(sim)
     elif args.handoff is not None:
         sim = Simulation(stops, routes, buses, riders, args.minutes,
-                         handoff_policy=POLICIES[args.handoff])
+                         handoff_policy=POLICIES[args.handoff],
+                         rider_policy=rider_policy,
+                         voice_feed=voice_feed)
         res = sim.run()
         print_report(res, args.seed, args.minutes,
-                     mode=f"{args.handoff} handoff")
+                     mode=f"{args.handoff} handoff{suffix}")
+        print_log(sim)
     else:
-        res = run_baseline(stops, routes, buses, riders, args.minutes)
-        print_report(res, args.seed, args.minutes)
+        sim = Simulation(stops, routes, buses, riders, args.minutes,
+                         rider_policy=rider_policy,
+                         voice_feed=voice_feed)
+        res = sim.run()
+        print_report(res, args.seed, args.minutes,
+                     mode=f"no handoff{suffix}")
     return 0
 
 

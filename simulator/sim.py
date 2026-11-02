@@ -10,6 +10,11 @@ the policy proposes, the verifier authorizes, the ledger executes.
 
 Phase 4 adds the dispatcher log: every proposal with its explanation
 and verdict, for the agentic dispatcher to narrate its decisions.
+
+Phase 5 adds rider consent: approved proposals become offers each rider
+can refuse via an optional rider policy (rule-based or Spark Open).
+Phase 6 adds voice signals: an optional feed of crowd notes that raises
+the assumed waiting count at a stop for a few minutes.
 """
 from __future__ import annotations
 
@@ -21,7 +26,7 @@ from verifier import Proposal, verify
 from .handoff import execute_handoff
 from .ledger import TicketLedger
 from .models import Bus, Rider, Route, Stop, Ticket
-from .network import DWELL_MIN, LEG_MIN
+from .network import DWELL_MIN, LEG_MIN, STOP_COORDS
 
 COOLDOWN_MIN = 40  # extra minutes after arrivals stop so buses finish trips
 
@@ -47,6 +52,9 @@ class SimResult:
     verifier_approvals: int = 0
     verifier_rejections: int = 0
     dispatcher_errors: int = 0
+    rider_offers: int = 0
+    rider_declines: int = 0
+    rider_errors: int = 0
     boardings_by_route: dict[str, int] = field(default_factory=dict)
     denied_by_route: dict[str, int] = field(default_factory=dict)
     peak_load_by_route: dict[str, float] = field(default_factory=dict)
@@ -63,6 +71,10 @@ class Simulation:
         riders: list[Rider],
         minutes: int,
         handoff_policy: HandoffPolicy | None = None,
+        record: bool = False,
+        rider_policy: Callable[[Simulation, str, str, str, str, int], bool]
+        | None = None,
+        voice_feed=None,
     ) -> None:
         self.stops = stops
         self.routes = routes
@@ -70,10 +82,15 @@ class Simulation:
         self.riders = {r.id: r for r in riders}
         self.minutes = minutes
         self.handoff_policy = handoff_policy
+        self.rider_policy = rider_policy
+        self.voice_feed = voice_feed
         self.ledger = TicketLedger()
         self.dispatcher_log: list[dict] = []
+        self.record = record
+        self.frames: list[dict] = []
         self._events = self._timetable()
         self._meet_counter = 0
+        self._minute_handoffs: list[dict] = []
         self.queues: dict[str, list[Rider]] = {sid: [] for sid in stops}
         self._arrivals = sorted(riders, key=lambda r: (r.arrival_min, r.id))
         self.result = SimResult(
@@ -103,6 +120,12 @@ class Simulation:
         return [bid for bid, sid in self._events.get(minute, [])
                 if sid == stop_id]
 
+    def voice_boost(self, stop_id: str, minute: int | None) -> int:
+        """Extra waiting riders assumed from recent voice signals."""
+        if self.voice_feed is None or minute is None:
+            return 0
+        return self.voice_feed.boost_at(stop_id, minute)
+
     def dwells_at(self, bus_id: str, stop_id: str) -> list[int]:
         """Minutes at which a bus dwells at a stop, in time order."""
         return sorted(m for m, evs in self._events.items()
@@ -131,21 +154,48 @@ class Simulation:
                     from_bus=bus.id, to_bus=to_bus_id, stop_id=stop_id,
                     rider_ids=tuple(rider_ids), minute=minute)
                 approved = verify(self, proposal).approved
+                declined: list[str] = []
+                consenting = list(rider_ids)
+                if approved and self.rider_policy is not None:
+                    consenting = []
+                    for rid in rider_ids:
+                        res.rider_offers += 1
+                        try:
+                            walks = self.rider_policy(
+                                self, rid, bus.id, to_bus_id,
+                                stop_id, minute)
+                        except Exception:
+                            res.rider_errors += 1
+                            walks = False
+                        if walks:
+                            consenting.append(rid)
+                        else:
+                            declined.append(rid)
+                            res.rider_declines += 1
                 self.dispatcher_log.append({
                     "minute": minute, "stop_id": stop_id,
                     "from_bus": bus.id, "to_bus": to_bus_id,
                     "rider_ids": list(rider_ids),
+                    "declined_ids": declined,
                     "explanation": explanation, "approved": approved,
                 })
                 if not approved:
                     res.verifier_rejections += 1
                     continue
                 res.verifier_approvals += 1
+                if not consenting:
+                    continue  # every rider refused; nothing moves
                 result = execute_handoff(
-                    self, bus.id, to_bus_id, stop_id, rider_ids, minute)
+                    self, bus.id, to_bus_id, stop_id, consenting, minute)
                 if result.ok:
                     res.handoff_events += 1
                     res.riders_transferred += len(result.moved)
+                    if self.record:
+                        self._minute_handoffs.append({
+                            "from_bus": bus.id, "to_bus": to_bus_id,
+                            "stop_id": stop_id, "riders": len(result.moved),
+                            "explanation": explanation,
+                        })
 
         downstream = set(route.downstream_of(stop_id))
         queue = self.queues[stop_id]
@@ -196,6 +246,39 @@ class Simulation:
             ordered.extend((bid, stop_id) for bid in bus_ids)
         return ordered
 
+    def bus_position(self, bus_id: str, minute: int) -> tuple[float, float]:
+        """Schematic map position: dwell stops pin to their coords, legs
+        interpolate linearly between them."""
+        stops = self.routes[self.buses[bus_id].route_id].stop_ids
+        sched = [(self.buses[bus_id].start_min + i * (DWELL_MIN + LEG_MIN),
+                  sid) for i, sid in enumerate(stops)]
+        if minute <= sched[0][0]:
+            return STOP_COORDS[sched[0][1]]
+        for (t0, s0), (t1, s1) in zip(sched, sched[1:]):
+            if minute <= t1:
+                f = (minute - t0) / (t1 - t0)
+                a, b = STOP_COORDS[s0], STOP_COORDS[s1]
+                return (a[0] + (b[0] - a[0]) * f,
+                        a[1] + (b[1] - a[1]) * f)
+        return STOP_COORDS[sched[-1][1]]
+
+    def _snapshot(self, minute: int) -> None:
+        buses = {}
+        for bid, bus in self.buses.items():
+            lat, lon = self.bus_position(bid, minute)
+            buses[bid] = {"route": bus.route_id, "lat": lat, "lon": lon,
+                          "onboard": len(bus.onboard),
+                          "capacity": bus.capacity,
+                          "start": bus.start_min}
+        self.frames.append({
+            "minute": minute,
+            "buses": buses,
+            "queues": {sid: len(q) for sid, q in self.queues.items()},
+            "denied": self.result.denied_boardings,
+            "handoffs": self._minute_handoffs,
+        })
+        self._minute_handoffs = []
+
     def run(self) -> SimResult:
         res = self.result
         upcoming = list(self._arrivals)
@@ -205,6 +288,8 @@ class Simulation:
                 self.queues[rider.origin_id].append(rider)
             for bus_id, stop_id in self._ordered_events(minute):
                 self._process_stop(self.buses[bus_id], stop_id, minute)
+            if self.record:
+                self._snapshot(minute)
 
         waits = [r.board_min - r.arrival_min for r in self.riders.values()
                  if r.board_min is not None]

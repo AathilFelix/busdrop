@@ -67,8 +67,9 @@ def get_corridor_state(sim: Simulation, bus_id: str, stop_id: str,
     from simulator.handoff import eligible_waiting
 
     bus = sim.buses[bus_id]
-    waiting = eligible_waiting(sim, bus_id, stop_id)
+    waiting = eligible_waiting(sim, bus_id, stop_id, minute)
     shortfall = waiting - (bus.capacity - len(bus.onboard))
+    voice_boost = sim.voice_boost(stop_id, minute)
     receivers = []
     for other_id in sim.buses_at(stop_id, minute):
         if other_id == bus_id:
@@ -104,6 +105,9 @@ def get_corridor_state(sim: Simulation, bus_id: str, stop_id: str,
             "shortfall": shortfall,
         },
         "receivers": receivers,
+        "voice": (f"Driver voice notes report a crowd here: +{voice_boost} "
+                  f"waiting assumed (already counted above)."
+                  if voice_boost else None),
     }
 
 

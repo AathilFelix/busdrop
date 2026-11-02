@@ -16,6 +16,22 @@ _TRUNK = ["THL", "LIC", "SIM", "CEN", "BWY"]
 # a third of the fleet is useless for handoffs.
 DEFAULT_ROUTE_OFFSETS = {"R3": 5}
 
+# Approximate stop coordinates for the dashboard map: real Chennai
+# locations along the Anna Salai corridor, schematic precision (relative
+# layout is right; don't navigate by it). (lat, lon).
+STOP_COORDS = {
+    "ROY": (13.0540, 80.2630),  # Royapettah
+    "PYC": (13.0575, 80.2595),  # Pycrofts Road
+    "TEY": (13.0470, 80.2500),  # Teynampet
+    "SIE": (13.0520, 80.2520),  # SIET
+    "GEM": (13.0590, 80.2545),  # Gemini
+    "THL": (13.0640, 80.2550),  # Thousand Lights
+    "LIC": (13.0695, 80.2580),  # LIC
+    "SIM": (13.0740, 80.2630),  # Simpson
+    "CEN": (13.0827, 80.2707),  # Central
+    "BWY": (13.0870, 80.2835),  # Broadway
+}
+
 
 def build_stops() -> dict[str, Stop]:
     names = {

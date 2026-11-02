@@ -96,18 +96,28 @@ def execute_handoff(
     return HandoffResult(True, moved=moved)
 
 
-def eligible_waiting(sim: Simulation, bus_id: str, stop_id: str) -> int:
-    """Waiting riders at a stop whose destination this bus serves."""
+def eligible_waiting(sim: Simulation, bus_id: str, stop_id: str,
+                     minute: int | None = None) -> int:
+    """Waiting riders at a stop whose destination this bus serves.
+
+    A minute unlocks the voice boost: recent crowd signals add assumed
+    waiting riders so the dispatcher reacts to what drivers hear, not
+    just to the counted queue.
+    """
     route = sim.routes[sim.buses[bus_id].route_id]
     downstream = set(route.downstream_of(stop_id))
-    return sum(1 for r in sim.queues[stop_id]
-               if r.destination_id in downstream)
+    counted = sum(1 for r in sim.queues[stop_id]
+                  if r.destination_id in downstream)
+    return counted + sim.voice_boost(stop_id, minute)
 
 
 def scripted_policy(
     sim: Simulation, bus_id: str, stop_id: str, minute: int
-) -> list[tuple[str, list[str]]]:
+) -> list[tuple]:
     """Deterministic demo driver for the handoff mechanics.
+
+    Requests are (to_bus, rider_ids, explanation): the sim records the
+    explanation in the dispatcher log and the frame handoffs.
 
     When more riders wait at a shared stop than the bus has free seats for,
     move just enough onboard riders (whose destinations continue downstream)
@@ -119,7 +129,7 @@ def scripted_policy(
     Spark dispatcher (dispatcher/) is the agentic driver.
     """
     bus = sim.buses[bus_id]
-    shortfall = eligible_waiting(sim, bus_id, stop_id) - (
+    shortfall = eligible_waiting(sim, bus_id, stop_id, minute) - (
         bus.capacity - len(bus.onboard))
     if shortfall <= 0:
         return []
@@ -146,7 +156,15 @@ def scripted_policy(
     )
     if not eligible:
         return []
-    return [(to_bus_id, eligible[:min(shortfall, spare)])]
+    moved = eligible[:min(shortfall, spare)]
+    waiting_word = "rider" if shortfall == 1 else "riders"
+    move_word = "moves" if len(moved) == 1 else "move"
+    explanation = (
+        f"{bus_id} is full with {shortfall} {waiting_word} still "
+        f"waiting, so {len(moved)} going the same way {move_word} to "
+        f"{to_bus_id}, which has spare seats."
+    )
+    return [(to_bus_id, moved, explanation)]
 
 
 def reckless_policy(
